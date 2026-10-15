@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UT Manager | Career Mode</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Setup Screen (Shows only on first visit to create the generic club) -->
+    <div id="setup-screen" class="setup-screen">
+        <div class="setup-box">
+            <h1>Welcome to UT Manager</h1>
+            <p>Enter your Career Mode club name to get started</p>
+            <input type="text" id="club-name-input" placeholder="e.g. AFC Bournemouth" required>
+            <button id="btn-create-club">Create Club</button>
+        </div>
+    </div>
+
+    <!-- Main Application Container -->
+    <div class="app-container" id="main-app" style="display: none;">
+        
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="logo">
+                <h2 id="display-club-name">Club <span>UT 26</span></h2>
+                <button id="btn-reset-club" class="text-btn">Change Club</button>
+            </div>
+            <nav>
+                <button id="btn-players" class="nav-btn active">Players View</button>
+                <button id="btn-add" class="nav-btn add-btn">+ Add New Card</button>
+            </nav>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <header>
+                <h1 id="page-title">Squad Players</h1>
+            </header>
+            
+            <!-- Dynamic Container for Cards or Forms -->
+            <div id="dynamic-container" class="cards-grid">
+                <!-- Content will load here dynamically via app.js -->
+            </div>
+        </main>
+        
+    </div>
+
+    <!-- Import JavaScript as a module for Firebase support -->
+    <script type="module" src="app.js"></script>
+</body>
+</html>

@@ -381,3 +381,123 @@ header { margin-bottom: 30px; }
     from { opacity: 0; transform: translateY(-10px); }
     to { opacity: 1; transform: translateY(0); }
 }
+
+/* Player Item Card Styling (متطابق مع كروت الـ Squad) */
+.player-item { 
+    background-color: var(--bg-surface); 
+    padding: 20px 15px; 
+    border-radius: 12px; 
+    text-align: center; 
+    position: relative; 
+    border: 1px solid var(--border-color); 
+    transition: var(--transition-smooth);
+    display: flex; 
+    flex-direction: column; 
+    align-items: center;
+    cursor: pointer;
+}
+.player-item:hover { 
+    transform: translateY(-8px); 
+    border-color: var(--gold); 
+    box-shadow: 0 12px 30px rgba(0,0,0,0.5); 
+}
+
+.player-item h4 {
+    color: var(--text-light);
+    font-size: 1.1rem;
+    margin-bottom: 6px;
+}
+
+.player-item span.pos-badge {
+    background: var(--bg-dark);
+    color: var(--gold);
+    padding: 4px 12px;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-weight: bold;
+}
+
+/* إظهار وإخفاء أزرار التعديل والحذف عند الـ Hover على كارت اللاعب */
+.player-item .delete-btn {
+    position: absolute; top: -12px; right: -12px;
+    background: var(--danger); color: white; border: none;
+    width: 32px; height: 32px; border-radius: 50%;
+    font-weight: bold; font-size: 0.95rem; cursor: pointer;
+    opacity: 0; transform: scale(0.8); transition: var(--transition-smooth);
+    box-shadow: 0 4px 10px rgba(239, 68, 68, 0.4);
+    z-index: 10; padding: 0;
+    display: flex; align-items: center; justify-content: center;
+}
+
+.player-item .edit-btn {
+    position: absolute; top: -12px; left: -12px;
+    background: var(--bg-dark); color: var(--gold);
+    border: 1px solid var(--gold);
+    height: 32px; padding: 0 14px; border-radius: 16px;
+    font-weight: 600; font-size: 0.8rem; cursor: pointer;
+    opacity: 0; transform: scale(0.8); transition: var(--transition-smooth);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
+    z-index: 10;
+    display: flex; align-items: center; justify-content: center;
+}
+
+.player-item:hover .delete-btn,
+.player-item:hover .edit-btn { 
+    opacity: 1; 
+    transform: scale(1); 
+}
+
+.player-item .delete-btn:hover { background: var(--danger-hover); transform: scale(1.1) !important; }
+.player-item .edit-btn:hover { background: var(--gold); color: #000; transform: scale(1.08) !important; }
+
+/* =========================================
+   Mobile Responsiveness Styling (< 768px)
+========================================= */
+@media screen and (max-width: 768px) {
+    body {
+        height: auto;
+        overflow: auto;
+    }
+
+    .app-container {
+        flex-direction: column;
+        height: auto;
+        min-height: 100vh;
+        overflow-y: auto;
+    }
+
+    .sidebar {
+        width: 100%;
+        height: auto;
+        border-right: none;
+        border-bottom: 1px solid var(--border-color);
+        padding: 20px 15px;
+    }
+
+    .main-content {
+        width: 100%;
+        padding: 20px 15px;
+        overflow-y: visible;
+    }
+
+    .cards-grid {
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        gap: 15px;
+    }
+
+    .setup-box {
+        width: 90% !important;
+        padding: 25px 20px;
+    }
+
+    .modal-box {
+        width: 90% !important;
+        padding: 20px;
+    }
+
+    .tabs {
+        width: 100%;
+        overflow-x: auto;
+        white-space: nowrap;
+    }
+}

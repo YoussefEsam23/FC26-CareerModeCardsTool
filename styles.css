@@ -1,0 +1,383 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+
+:root {
+    --bg-dark: #0f1015;
+    --bg-surface: #1a1c23;
+    --bg-surface-hover: #23252e;
+    --border-color: #2a2d3a;
+    --text-light: #ffffff;
+    --text-muted: #9ca3af;
+    --gold: #f5c342;
+    --gold-hover: #e0b030;
+    --danger: #ef4444;
+    --danger-hover: #dc2626;
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+* { 
+    margin: 0; 
+    padding: 0; 
+    box-sizing: border-box; 
+    font-family: 'Poppins', sans-serif; 
+}
+
+body { 
+    background-color: var(--bg-dark); 
+    color: var(--text-light); 
+    display: flex; 
+    height: 100vh; 
+    overflow: hidden;
+}
+
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: var(--bg-dark); }
+::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+h1, h2, h3 { color: var(--text-light); letter-spacing: -0.5px; }
+h1.gold-text, h3.gold-text { color: var(--gold); }
+
+input, select, textarea {
+    width: 100%;
+    padding: 14px 16px;
+    background: #14151b;
+    border: 1px solid var(--border-color);
+    color: var(--text-light);
+    border-radius: 8px;
+    font-size: 0.95rem;
+    transition: var(--transition-smooth);
+    outline: none;
+}
+
+input:focus, select:focus {
+    border-color: var(--gold);
+    box-shadow: 0 0 0 3px rgba(245, 195, 66, 0.15);
+}
+
+input[type="file"] {
+    padding: 10px;
+    background: var(--bg-surface);
+    color: var(--text-muted);
+}
+
+button {
+    padding: 12px 24px;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: var(--transition-smooth);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+button.primary-btn { background: var(--gold); color: #000; }
+button.primary-btn:hover { background: var(--gold-hover); transform: translateY(-2px); box-shadow: 0 4px 15px rgba(245, 195, 66, 0.3); }
+
+button.danger-btn { background: var(--danger); color: white; }
+button.danger-btn:hover { background: var(--danger-hover); transform: translateY(-2px); box-shadow: 0 4px 15px rgba(239, 68, 68, 0.3); }
+
+.icon-btn {
+    background: var(--danger);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    cursor: pointer;
+    transition: var(--transition-smooth);
+    padding: 0;
+}
+.icon-btn:hover { background: var(--danger-hover); transform: scale(1.1); }
+
+.text-btn { 
+    background: none; 
+    border: none; 
+    color: var(--text-muted); 
+    font-size: 0.85rem; 
+    cursor: pointer; 
+    transition: var(--transition-smooth);
+    padding: 0;
+}
+.text-btn:hover { color: var(--text-light); }
+
+.setup-screen { 
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+    background-color: rgba(15, 16, 21, 0.95); 
+    backdrop-filter: blur(10px);
+    display: flex; justify-content: center; align-items: center; 
+    z-index: 1000; 
+    animation: fadeIn 0.4s ease;
+}
+
+.setup-box { 
+    background-color: var(--bg-surface); 
+    padding: 40px; 
+    border-radius: 16px; 
+    text-align: center; 
+    border: 1px solid var(--border-color); 
+    width: 450px; 
+    box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+}
+
+.setup-box form { display: flex; flex-direction: column; gap: 15px; margin-top: 20px; }
+
+.list-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--bg-dark);
+    padding: 12px 16px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    margin-bottom: 10px;
+    transition: var(--transition-smooth);
+    cursor: pointer;
+}
+.list-item:hover { border-color: var(--gold); transform: translateX(5px); }
+.list-item span { font-weight: 600; font-size: 1.1rem; }
+.list-actions { display: flex; gap: 8px; }
+
+.app-container { display: flex; width: 100%; height: 100vh; }
+
+.sidebar { 
+    width: 280px; 
+    background-color: var(--bg-surface); 
+    padding: 30px 20px; 
+    border-right: 1px solid var(--border-color); 
+    display: flex; 
+    flex-direction: column; 
+}
+
+/* =========================================
+   Logo & Switcher Buttons (Club / Season)
+========================================= */
+.logo { 
+    margin-bottom: 25px; 
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.club-header-info {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 16px;
+}
+
+.logo h2 { 
+    font-size: 1.7rem; 
+    font-weight: 700; 
+    line-height: 1.2;
+    word-break: break-word;
+}
+
+.season-badge {
+    display: inline-block;
+    width: fit-content;
+    background: rgba(245, 195, 66, 0.12);
+    color: var(--gold);
+    border: 1px solid rgba(245, 195, 66, 0.3);
+    padding: 3px 10px;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.switcher-btns {
+    display: flex;
+    gap: 10px;
+    width: 100%;
+}
+
+.switch-btn {
+    flex: 1;
+    background: var(--bg-dark);
+    color: var(--text-muted);
+    padding: 10px 12px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    border-left: 3px solid var(--border-color);
+    justify-content: flex-start;
+    white-space: nowrap;
+    transition: background-color 0.3s, color 0.3s, border-color 0.3s, transform 0.3s;
+}
+
+.switch-btn:hover {
+    background-color: rgba(245, 195, 66, 0.1);
+    color: var(--gold);
+    border-color: rgba(245, 195, 66, 0.3);
+    border-left: 3px solid var(--gold);
+    border-radius: 0 8px 8px 0;
+    transform: translateX(3px);
+}
+
+/* =========================================
+   Navigation Buttons
+========================================= */
+.nav-btn { 
+    background: transparent; 
+    color: var(--text-muted); 
+    padding: 14px 20px; 
+    text-align: left; 
+    width: 100%; 
+    margin-bottom: 8px; 
+    border-radius: 8px; 
+    border-left: 3px solid var(--border-color);
+    justify-content: flex-start;
+    font-weight: 500;
+    transition: background-color 0.3s, color 0.3s, border-color 0.3s, transform 0.3s;
+}
+.nav-btn:hover { 
+    background-color: rgba(255,255,255,0.03); 
+    color: var(--text-light); 
+    border-left-color: var(--text-muted);
+    transform: translateX(4px); 
+}
+.nav-btn.active { 
+    background-color: rgba(245, 195, 66, 0.1); 
+    color: var(--gold); 
+    border-left: 3px solid var(--gold); 
+    border-radius: 0 8px 8px 0;
+}
+
+.add-btn { background-color: var(--gold); color: #000; margin-top: auto; justify-content: center; border-left: none; }
+.add-btn:hover { background-color: var(--gold-hover); transform: translateY(-2px); border-left: none; }
+.add-btn.active { border-left: none; border-radius: 8px; }
+
+/* =========================================
+   Main Content & Cards Grid
+========================================= */
+.main-content { flex: 1; padding: 40px; overflow-y: auto; position: relative; }
+header { margin-bottom: 30px; }
+#page-title { color: var(--text-light); font-size: 2rem; margin-bottom: 20px; }
+
+.tabs { display: flex; gap: 10px; background: var(--bg-surface); padding: 5px; border-radius: 10px; width: fit-content; border: 1px solid var(--border-color); }
+.tab-btn { background: transparent; color: var(--text-muted); border-radius: 6px; padding: 10px 24px; font-weight: 500; }
+.tab-btn:hover { color: var(--text-light); }
+.tab-btn.active { background: var(--bg-dark); color: var(--gold); box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
+
+.cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 25px; padding-bottom: 40px; }
+.group-header { width: 100%; grid-column: 1 / -1; color: var(--gold); font-size: 1.2rem; font-weight: 600; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; margin-top: 30px; margin-bottom: 10px; }
+
+.card-item { 
+    background-color: var(--bg-surface); 
+    padding: 15px; 
+    border-radius: 12px; 
+    text-align: center; 
+    position: relative; 
+    border: 1px solid var(--border-color); 
+    transition: var(--transition-smooth);
+    display: flex; flex-direction: column; align-items: center;
+}
+.card-item:hover { transform: translateY(-8px); border-color: var(--gold); box-shadow: 0 12px 30px rgba(0,0,0,0.5); }
+.card-item img { width: 100%; max-width: 180px; border-radius: 8px; transition: var(--transition-smooth); }
+
+.card-info { margin-top: 15px; width: 100%; }
+.card-info h3 { font-size: 1.1rem; font-weight: 600; color: var(--text-light); }
+.card-info h3 span { color: var(--gold); font-weight: 700; margin-left: 5px;}
+.card-info p { font-size: 0.85rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-top: 4px;}
+
+/* =========================================
+   Card Action Buttons (Edit & Delete)
+========================================= */
+.delete-btn {
+    position: absolute; top: -12px; right: -12px;
+    background: var(--danger); color: white; border: none;
+    width: 32px; height: 32px; border-radius: 50%;
+    font-weight: bold; font-size: 0.95rem; cursor: pointer;
+    opacity: 0; transform: scale(0.8); transition: var(--transition-smooth);
+    box-shadow: 0 4px 10px rgba(239, 68, 68, 0.4);
+    z-index: 10; padding: 0;
+}
+
+.edit-btn {
+    position: absolute; top: -12px; left: -12px;
+    background: var(--bg-dark); color: var(--gold);
+    border: 1px solid var(--gold);
+    height: 32px; padding: 0 14px; border-radius: 16px;
+    font-weight: 600; font-size: 0.8rem; cursor: pointer;
+    opacity: 0; transform: scale(0.8); transition: var(--transition-smooth);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
+    z-index: 10;
+}
+
+.card-item:hover .delete-btn,
+.card-item:hover .edit-btn { 
+    opacity: 1; 
+    transform: scale(1); 
+}
+
+.delete-btn:hover { background: var(--danger-hover); transform: scale(1.1) !important; }
+.edit-btn:hover { background: var(--gold); color: #000; transform: scale(1.08) !important; }
+
+/* =========================================
+   Edit Modal Window
+========================================= */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(10, 11, 15, 0.85);
+    backdrop-filter: blur(8px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 2000;
+    animation: fadeIn 0.25s ease;
+}
+
+.modal-box {
+    background-color: var(--bg-surface);
+    padding: 32px;
+    border-radius: 16px;
+    border: 1px solid var(--gold);
+    width: 420px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    box-shadow: 0 25px 50px rgba(0, 0, 0, 0.75);
+}
+
+.modal-box h3 {
+    color: var(--gold);
+    font-size: 1.4rem;
+    margin-bottom: 5px;
+}
+
+.modal-box label {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-bottom: -6px;
+}
+
+.modal-box input, .modal-box select {
+    padding: 12px 14px;
+    background: var(--bg-dark);
+    color: var(--text-light);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    width: 100%;
+}
+
+.modal-buttons {
+    display: flex;
+    gap: 12px;
+    margin-top: 10px;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}

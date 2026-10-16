@@ -1,244 +1,604 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-import { getFirestore, collection, addDoc, getDocs, query, where, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+import { getFirestore, collection, addDoc, getDocs, query, where, deleteDoc, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
 
-// ==========================================
-// 1. Firebase Configuration 
-// (Replace these values with your Firebase project config)
-// ==========================================
 const firebaseConfig = {
-
   apiKey: "AIzaSyBfXLI4Qa3aEEAQL7E4fXuhaZaM03pGHfs",
-
   authDomain: "careermodecardstool.firebaseapp.com",
-
   projectId: "careermodecardstool",
-
   storageBucket: "careermodecardstool.firebasestorage.app",
-
   messagingSenderId: "58226577235",
-
   appId: "1:58226577235:web:0ecaffcdffa036a7791ba6"
-
 };
-
-
-// ==========================================
-// 2. ImgBB API Key 
-// (Replace with your actual ImgBB key)
-// ==========================================
 const IMGBB_API_KEY = "15c9b9cc00be7e9fde7dfd51f6874522";
 
-// Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+const auth = getAuth(app);
 
-// DOM Elements
-const setupScreen = document.getElementById('setup-screen');
-const mainApp = document.getElementById('main-app');
-const clubNameInput = document.getElementById('club-name-input');
-const btnCreateClub = document.getElementById('btn-create-club');
-const displayClubName = document.getElementById('display-club-name');
-const btnResetClub = document.getElementById('btn-reset-club');
+let currentUser = null;
+let currentClubId = "";
+let currentClubName = "";
+let currentSeasonId = "";
+let currentSeasonName = "";
+let selectedRosterPlayer = null; // لتتبع صفحة اللاعب المفتوحة من داخل الـ Roster
 
-const container = document.getElementById('dynamic-container');
-const pageTitle = document.getElementById('page-title');
-const btnPlayers = document.getElementById('btn-players');
-const btnAdd = document.getElementById('btn-add');
+const authScreen = document.getElementById('auth-screen');
+const authForm = document.getElementById('auth-form');
+let isLoginMode = true;
 
-// Variable to store the current club name
-let currentClub = "";
+document.getElementById('auth-toggle-btn').addEventListener('click', () => {
+    isLoginMode = !isLoginMode;
+    document.getElementById('auth-title').textContent = isLoginMode ? "Login" : "Sign Up";
+    document.getElementById('auth-submit-btn').textContent = isLoginMode ? "Login" : "Create Account";
+    document.getElementById('auth-toggle-text').textContent = isLoginMode ? "Don't have an account?" : "Already have an account?";
+    document.getElementById('auth-toggle-btn').textContent = isLoginMode ? "Sign Up" : "Login";
+    document.getElementById('auth-error').style.display = "none";
+});
 
-// ==========================================
-// 3. Club Management Logic (Generic Tool)
-// ==========================================
-function checkClub() {
-    const savedClub = localStorage.getItem('careerModeClub');
-    if (savedClub) {
-        currentClub = savedClub;
-        setupScreen.style.display = 'none';
-        mainApp.style.display = 'flex';
-        
-        // Format club name for display (e.g., first 3 letters)
-        const shortName = savedClub.substring(0, 3).toUpperCase();
-        displayClubName.innerHTML = `${shortName} <span>UT 26</span>`;
-        document.title = `${savedClub} | UT Manager`;
-        
-        // Load cards specific to this club
-        loadCards();
-    } else {
-        setupScreen.style.display = 'flex';
-        mainApp.style.display = 'none';
+authForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = document.getElementById('auth-email').value;
+    const pwd = document.getElementById('auth-password').value;
+    const errorEl = document.getElementById('auth-error');
+    errorEl.style.display = "none";
+    try {
+        if (isLoginMode) await signInWithEmailAndPassword(auth, email, pwd);
+        else await createUserWithEmailAndPassword(auth, email, pwd);
+    } catch (err) { 
+        errorEl.textContent = err.message;
+        errorEl.style.display = "block";
     }
+});
+
+const handleLogout = async () => await signOut(auth);
+document.getElementById('btn-logout').addEventListener('click', handleLogout);
+document.getElementById('btn-logout-clubs').addEventListener('click', handleLogout);
+
+onAuthStateChanged(auth, (user) => {
+    if (user) {
+        currentUser = user;
+        authScreen.style.display = 'none';
+        loadClubsScreen();
+    } else {
+        currentUser = null;
+        authScreen.style.display = 'flex';
+        document.getElementById('clubs-screen').style.display = 'none';
+        document.getElementById('seasons-screen').style.display = 'none';
+        document.getElementById('main-app').style.display = 'none';
+    }
+});
+
+const clubsScreen = document.getElementById('clubs-screen');
+const seasonsScreen = document.getElementById('seasons-screen');
+const mainApp = document.getElementById('main-app');
+
+document.getElementById('btn-back-to-clubs-setup').addEventListener('click', loadClubsScreen);
+document.getElementById('btn-back-clubs').addEventListener('click', loadClubsScreen);
+document.getElementById('btn-back-seasons').addEventListener('click', loadSeasonsScreen);
+
+// ----------------------------------------------------
+// Global Delete Handlers
+// ----------------------------------------------------
+window.deleteClub = async function(clubId) {
+    try {
+        await deleteDoc(doc(db, "clubs", clubId));
+        await loadClubsScreen();
+    } catch (err) {
+        console.error("Error deleting club:", err);
+        alert("Error deleting club: " + err.message);
+    }
+};
+
+window.deleteSeason = async function(seasonId) {
+    try {
+        await deleteDoc(doc(db, "seasons", seasonId));
+        await loadSeasonsScreen();
+    } catch (err) {
+        console.error("Error deleting season:", err);
+        alert("Error deleting season: " + err.message);
+    }
+};
+
+window.deletePlayer = async function(playerId) {
+    try {
+        await deleteDoc(doc(db, "players", playerId));
+        document.getElementById('btn-roster').click();
+    } catch (err) {
+        console.error("Error deleting player:", err);
+        alert("Error deleting player: " + err.message);
+    }
+};
+
+window.deleteCard = async function(cardId) {
+    try {
+        await deleteDoc(doc(db, "cards", cardId));
+        if (selectedRosterPlayer) {
+            openPlayerCards(selectedRosterPlayer.name, selectedRosterPlayer.position);
+        } else {
+            document.getElementById('btn-players').click();
+        }
+    } catch (err) {
+        console.error("Error deleting card:", err);
+        alert("Error deleting card: " + err.message);
+    }
+};
+
+// ----------------------------------------------------
+// Clubs & Seasons Management
+// ----------------------------------------------------
+async function loadClubsScreen() {
+    clubsScreen.style.display = 'flex';
+    seasonsScreen.style.display = 'none';
+    mainApp.style.display = 'none';
+    const list = document.getElementById('clubs-list');
+    list.innerHTML = "<p style='color: var(--text-muted);'>Loading your clubs...</p>";
+    
+    const q = query(collection(db, "clubs"), where("userId", "==", currentUser.uid));
+    const snap = await getDocs(q);
+    list.innerHTML = "";
+    
+    if (snap.empty) {
+        list.innerHTML = "<p style='color: var(--text-muted);'>No clubs found. Create your first club below!</p>";
+        return;
+    }
+
+    snap.forEach(docSnap => {
+        const c = docSnap.data();
+        list.innerHTML += `
+            <div class="list-item" onclick="enterClub('${docSnap.id}', '${c.name}')">
+                <span>${c.name}</span>
+                <div class="list-actions" onclick="event.stopPropagation();">
+                    <button class="icon-btn" onclick="deleteClub('${docSnap.id}')">X</button>
+                </div>
+            </div>`;
+    });
 }
 
-btnCreateClub.addEventListener('click', () => {
-    const clubName = clubNameInput.value.trim();
-    if (clubName) {
-        localStorage.setItem('careerModeClub', clubName);
-        checkClub();
-    }
+document.getElementById('create-club-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = e.target.querySelector('button'); btn.disabled = true;
+    await addDoc(collection(db, "clubs"), { name: document.getElementById('new-club-name').value, userId: currentUser.uid });
+    document.getElementById('new-club-name').value = '';
+    btn.disabled = false;
+    loadClubsScreen();
 });
 
-btnResetClub.addEventListener('click', () => {
-    if(confirm("Are you sure? This will hide current cards and ask for a new club name.")) {
-        localStorage.removeItem('careerModeClub');
-        clubNameInput.value = '';
-        checkClub();
+window.enterClub = function(id, name) {
+    currentClubId = id; currentClubName = name;
+    loadSeasonsScreen();
+};
+
+async function loadSeasonsScreen() {
+    clubsScreen.style.display = 'none';
+    seasonsScreen.style.display = 'flex';
+    mainApp.style.display = 'none';
+    document.getElementById('seasons-club-title').textContent = currentClubName;
+    
+    const list = document.getElementById('seasons-list');
+    list.innerHTML = "<p style='color: var(--text-muted);'>Loading...</p>";
+    
+    const q = query(collection(db, "seasons"), where("clubId", "==", currentClubId));
+    const snap = await getDocs(q);
+    list.innerHTML = "";
+    
+    if (snap.empty) {
+        list.innerHTML = "<p style='color: var(--text-muted);'>No seasons found.</p>";
     }
+
+    snap.forEach(docSnap => {
+        const s = docSnap.data();
+        list.innerHTML += `
+            <div class="list-item" onclick="enterSeason('${docSnap.id}', '${s.name}')">
+                <span>${s.name}</span>
+                <div class="list-actions" onclick="event.stopPropagation();">
+                    <button class="icon-btn" onclick="deleteSeason('${docSnap.id}')">X</button>
+                </div>
+            </div>`;
+    });
+}
+
+document.getElementById('create-season-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = e.target.querySelector('button'); btn.disabled = true;
+    await addDoc(collection(db, "seasons"), { name: document.getElementById('new-season-name').value, clubId: currentClubId, userId: currentUser.uid });
+    document.getElementById('new-season-name').value = '';
+    btn.disabled = false;
+    loadSeasonsScreen();
 });
 
-// Run on initialization
-checkClub();
+window.enterSeason = function(id, name) {
+    currentSeasonId = id; currentSeasonName = name;
+    seasonsScreen.style.display = 'none';
+    mainApp.style.display = 'flex';
+    document.getElementById('display-club-name').textContent = currentClubName;
+    document.getElementById('display-season-name').textContent = currentSeasonName;
+    document.getElementById('btn-players').click();
+};
 
-// ==========================================
-// 4. Navigation Logic
-// ==========================================
 function setActiveButton(activeBtn) {
     document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
     activeBtn.classList.add('active');
 }
 
-btnPlayers.addEventListener('click', () => {
-    setActiveButton(btnPlayers);
-    pageTitle.textContent = "Squad Players";
-    loadCards();
+// ----------------------------------------------------
+// Club Roster & Clickable Player Cards Page
+// ----------------------------------------------------
+document.getElementById('btn-roster').addEventListener('click', async () => {
+    selectedRosterPlayer = null;
+    setActiveButton(document.getElementById('btn-roster'));
+    document.getElementById('page-title').textContent = "Season Roster";
+    document.getElementById('view-tabs-container').style.display = 'none';
+    const container = document.getElementById('dynamic-container');
+    container.className = "";
+    container.innerHTML = "<p style='color: var(--text-muted);'>Loading your players...</p>";
+
+    const q = query(collection(db, "players"), where("seasonId", "==", currentSeasonId));
+    const querySnapshot = await getDocs(q);
+    
+    let rosterHTML = `
+        <div class="setup-box" style="margin: 0; box-shadow: none; width: 100%; max-width: 600px; text-align: left; margin-bottom: 30px;">
+            <h3 class="gold-text" style="margin-bottom: 15px;">Register New Player</h3>
+            <form id="add-player-form" style="display: flex; gap: 10px;">
+                <input type="text" id="newPlayerName" placeholder="Player Name" required style="flex:1;">
+                <input type="text" id="newPlayerPosition" placeholder="Pos (e.g. ST)" required style="width: 120px;">
+                <button type="submit" class="primary-btn">Add Player</button>
+            </form>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px;">
+    `;
+
+    if (querySnapshot.empty) {
+        rosterHTML += `<p style='color: var(--text-muted); grid-column: 1/-1;'>No players registered. Add one above!</p>`;
+    } else {
+        querySnapshot.forEach((docSnap) => {
+            const p = docSnap.data();
+            rosterHTML += `
+                <div onclick="openPlayerCards('${p.playerName}', '${p.position}')" 
+                     onmouseover="this.style.borderColor='var(--gold)'; this.style.transform='translateY(-4px)';" 
+                     onmouseout="this.style.borderColor='var(--border-color)'; this.style.transform='translateY(0)';"
+                     style="background: var(--bg-surface); border: 1px solid var(--border-color); padding: 18px 15px; border-radius: 8px; text-align: center; position:relative; cursor: pointer; transition: var(--transition-smooth);">
+                    <button onclick="event.stopPropagation(); deletePlayer('${docSnap.id}')" class="icon-btn" style="position:absolute; top:-10px; right:-10px;">X</button>
+                    <h4 style="color: var(--text-light); font-size:1.1rem; margin-bottom:8px;">${p.playerName}</h4>
+                    <span style="background: var(--bg-dark); color: var(--gold); padding: 4px 10px; border-radius: 4px; font-size: 0.8rem; font-weight: bold;">${p.position}</span>
+                </div>
+            `;
+        });
+    }
+    rosterHTML += `</div>`;
+    container.innerHTML = rosterHTML;
+
+    document.getElementById('add-player-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = e.target.querySelector('button'); btn.disabled = true;
+        await addDoc(collection(db, "players"), {
+            playerName: document.getElementById('newPlayerName').value.trim(),
+            position: document.getElementById('newPlayerPosition').value.trim(),
+            seasonId: currentSeasonId,
+            userId: currentUser.uid,
+            createdAt: new Date()
+        });
+        document.getElementById('btn-roster').click();
+    });
 });
 
-btnAdd.addEventListener('click', () => {
-    setActiveButton(btnAdd);
-    pageTitle.textContent = "Add New Card";
-    container.className = ""; 
+// فتح صفحة كروت لاعب معين عند الضغط عليه في الـ Roster
+window.openPlayerCards = async function(playerName, position) {
+    selectedRosterPlayer = { name: playerName, position: position };
+    document.getElementById('page-title').innerHTML = `
+        <div style="display: flex; align-items: center; gap: 15px;">
+            <button onclick="document.getElementById('btn-roster').click()" class="switch-btn" style="flex: none; width: auto; padding: 8px 14px;">&larr; Back to Roster</button>
+            <span>${playerName} <span style="color: var(--gold); font-size: 1.2rem;">(${position})</span></span>
+        </div>
+    `;
+    document.getElementById('view-tabs-container').style.display = 'none';
+
+    const container = document.getElementById('dynamic-container');
+    container.className = "cards-grid";
+    container.innerHTML = "<p style='color: var(--text-muted);'>Loading player cards...</p>";
+
+    const q = query(collection(db, "cards"), where("seasonId", "==", currentSeasonId), where("playerName", "==", playerName));
+    const snap = await getDocs(q);
+    const playerCards = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+    // ترتيب كروت اللاعب من الأعلى تقييماً للأقل
+    playerCards.sort((a, b) => Number(b.rating) - Number(a.rating));
+
+    container.innerHTML = "";
+    if (playerCards.length === 0) {
+        container.innerHTML = `<p style='color: var(--text-muted); grid-column: 1/-1;'>No cards found for ${playerName} in this season.</p>`;
+        return;
+    }
+
+    playerCards.forEach(card => {
+        container.innerHTML += createCardHTML(card);
+    });
+};
+
+// ----------------------------------------------------
+// Cards Management & Triple View (Player / Event / Rating)
+// ----------------------------------------------------
+let allCards = []; 
+let currentViewMode = 'player'; // 'player' | 'promo' | 'rating'
+
+function setActiveTab(activeId) {
+    document.querySelectorAll('#view-tabs-container .tab-btn').forEach(btn => btn.classList.remove('active'));
+    document.getElementById(activeId).classList.add('active');
+}
+
+document.getElementById('view-by-player').addEventListener('click', () => {
+    currentViewMode = 'player';
+    setActiveTab('view-by-player');
+    renderCards();
+});
+
+document.getElementById('view-by-promo').addEventListener('click', () => {
+    currentViewMode = 'promo';
+    setActiveTab('view-by-promo');
+    renderCards();
+});
+
+document.getElementById('view-by-rating').addEventListener('click', () => {
+    currentViewMode = 'rating';
+    setActiveTab('view-by-rating');
+    renderCards();
+});
+
+document.getElementById('btn-players').addEventListener('click', async () => {
+    selectedRosterPlayer = null;
+    setActiveButton(document.getElementById('btn-players'));
+    document.getElementById('page-title').textContent = "Squad Cards";
+    document.getElementById('view-tabs-container').style.display = 'flex';
+    document.getElementById('dynamic-container').className = "cards-grid";
+    document.getElementById('dynamic-container').innerHTML = "<p style='color: var(--text-muted);'>Loading...</p>";
     
-    // Render the Add Card form dynamically
-    container.innerHTML = `
-        <div style="background: #1e1e1e; padding: 20px; border-radius: 8px; max-width: 500px;">
-            <form id="add-card-form" style="display: flex; flex-direction: column; gap: 15px;">
-                <input type="text" id="playerName" placeholder="Player Name (e.g. Alex Scott)" required style="padding: 10px; background: #121212; color: white; border: 1px solid #333; border-radius: 5px;">
-                <select id="promoEvent" required style="padding: 10px; background: #121212; color: white; border: 1px solid #333; border-radius: 5px;">
-                    <option value="Gold Base">Gold Base</option>
-                    <option value="TOTW">Team of the Week</option>
-                    <option value="RTTK">Road to the Knockouts (RTTK)</option>
-                    <option value="Player Moments">Player Moments</option>
-                    <option value="Scream">Scream (Halloween)</option>
+    const q = query(collection(db, "cards"), where("seasonId", "==", currentSeasonId));
+    const snap = await getDocs(q);
+    allCards = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderCards();
+});
+
+function createCardHTML(card) {
+    return `
+        <div class="card-item">
+            <button class="edit-btn" onclick="openEditModal('${card.id}', '${card.playerName}', '${card.promoEvent}', ${card.rating}, '${card.imageUrl}')">Edit</button>
+            <button class="delete-btn" onclick="deleteCard('${card.id}')">X</button>
+            <img src="${card.imageUrl}" alt="${card.playerName}">
+            <div class="card-info">
+                <h3>${card.playerName} <span>${card.rating}</span></h3>
+                <p>${card.promoEvent}</p>
+            </div>
+        </div>
+    `;
+}
+
+function renderCards() {
+    const container = document.getElementById('dynamic-container');
+    container.innerHTML = "";
+    
+    if (allCards.length === 0) {
+        container.innerHTML = "<p style='color: var(--text-muted);'>No cards found.</p>";
+        return;
+    }
+
+    // الخيار الثالث: ترتيب كل الكروت من الأكبر للأصغر في الـ Rating بدون مجموعات
+    if (currentViewMode === 'rating') {
+        const sortedCards = [...allCards].sort((a, b) => Number(b.rating) - Number(a.rating));
+        sortedCards.forEach(card => {
+            container.innerHTML += createCardHTML(card);
+        });
+        return;
+    }
+
+    // التجميع حسب اللاعب أو الإيفنت
+    const groups = {};
+    allCards.forEach(card => {
+        const key = currentViewMode === 'player' ? card.playerName : card.promoEvent;
+        if (!groups[key]) groups[key] = [];
+        groups[key].push(card);
+    });
+
+    for (const [groupName, cards] of Object.entries(groups)) {
+        // ترتيب الكروت داخل كل مجموعة من الأعلى للأقل تقييماً
+        cards.sort((a, b) => Number(b.rating) - Number(a.rating));
+        container.innerHTML += `<h2 class="group-header">${groupName}</h2>`;
+        cards.forEach(card => {
+            container.innerHTML += createCardHTML(card);
+        });
+    }
+}
+
+// ----------------------------------------------------
+// Edit Card Modal Logic (مع دعم + Add New Event)
+// ----------------------------------------------------
+window.openEditModal = async function(cardId, curPlayer, curPromo, curRating, curImg) {
+    const pQ = query(collection(db, "players"), where("seasonId", "==", currentSeasonId));
+    const pSnap = await getDocs(pQ);
+    let pOptions = "";
+    pSnap.forEach(d => {
+        const pName = d.data().playerName;
+        pOptions += `<option value="${pName}" ${pName === curPlayer ? 'selected' : ''}>${pName}</option>`;
+    });
+
+    const eQ = query(collection(db, "user_events"), where("userId", "==", currentUser.uid));
+    const eSnap = await getDocs(eQ);
+    let eventOptions = `
+        <option value="Gold Base" ${curPromo === 'Gold Base' ? 'selected' : ''}>Gold Base</option>
+        <option value="TOTW" ${curPromo === 'TOTW' ? 'selected' : ''}>TOTW</option>
+    `;
+    eSnap.forEach(d => {
+        const eName = d.data().name;
+        eventOptions += `<option value="${eName}" ${eName === curPromo ? 'selected' : ''}>${eName}</option>`;
+    });
+    eventOptions += `<option value="ADD_NEW">+ Add New Event...</option>`;
+
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.id = 'edit-modal';
+    modal.innerHTML = `
+        <div class="modal-box">
+            <h3 class="gold-text">Edit Card Details</h3>
+            <form id="edit-card-form" style="display:flex; flex-direction:column; gap:12px; margin-top:10px; text-align:left;">
+                <label>Assigned Player:</label>
+                <select id="editPlayer">${pOptions}</select>
+                
+                <label>Promo Event:</label>
+                <select id="editPromo" onchange="if(this.value==='ADD_NEW') document.getElementById('editCustomEventContainer').style.display='block'; else document.getElementById('editCustomEventContainer').style.display='none';">
+                    ${eventOptions}
                 </select>
-                <input type="number" id="rating" placeholder="Overall Rating" required style="padding: 10px; background: #121212; color: white; border: 1px solid #333; border-radius: 5px;">
-                <input type="file" id="cardImage" accept="image/*" required style="color: white;">
-                <button type="submit" id="submitBtn" style="background: #d4af37; padding: 10px; border: none; font-weight: bold; border-radius: 5px; cursor: pointer;">Upload Card</button>
+
+                <div id="editCustomEventContainer" style="display:none;">
+                    <input type="text" id="editCustomEventName" placeholder="Type new event name...">
+                </div>
+                
+                <label>Overall Rating:</label>
+                <input type="number" id="editRating" value="${curRating}" required>
+                
+                <label>New Image (Leave empty to keep current):</label>
+                <input type="file" id="editImage" accept="image/*">
+                
+                <div class="modal-buttons" style="display:flex; gap:10px; margin-top:10px;">
+                    <button type="submit" class="primary-btn btn-save" id="saveEditBtn" style="flex:1;">Save Changes</button>
+                    <button type="button" class="danger-btn btn-cancel" onclick="document.getElementById('edit-modal').remove()" style="flex:1;">Cancel</button>
+                </div>
+            </form>
+        </div>
+    `;
+    document.body.appendChild(modal);
+
+    document.getElementById('edit-card-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = document.getElementById('saveEditBtn');
+        btn.textContent = "Saving...";
+        btn.disabled = true;
+
+        try {
+            let eventName = document.getElementById('editPromo').value;
+            if (eventName === 'ADD_NEW') {
+                eventName = document.getElementById('editCustomEventName').value.trim();
+                if (!eventName) throw new Error("Please enter a name for the new event.");
+                await addDoc(collection(db, "user_events"), { name: eventName, userId: currentUser.uid });
+            }
+
+            let imageUrl = curImg;
+            const fileInput = document.getElementById('editImage');
+            if (fileInput.files.length > 0) {
+                const formData = new FormData();
+                formData.append('image', fileInput.files[0]);
+                const imgRes = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, { method: 'POST', body: formData });
+                const imgData = await imgRes.json();
+                if (imgData.success) imageUrl = imgData.data.url;
+            }
+
+            await updateDoc(doc(db, "cards", cardId), {
+                playerName: document.getElementById('editPlayer').value,
+                promoEvent: eventName,
+                rating: Number(document.getElementById('editRating').value),
+                imageUrl: imageUrl
+            });
+
+            document.getElementById('edit-modal').remove();
+            if (selectedRosterPlayer) {
+                openPlayerCards(selectedRosterPlayer.name, selectedRosterPlayer.position);
+            } else {
+                document.getElementById('btn-players').click();
+            }
+        } catch (err) {
+            alert("Error updating card: " + err.message);
+            btn.textContent = "Save Changes";
+            btn.disabled = false;
+        }
+    });
+};
+
+// ----------------------------------------------------
+// Upload Card & Dynamic Events
+// ----------------------------------------------------
+document.getElementById('btn-add').addEventListener('click', async () => {
+    selectedRosterPlayer = null;
+    setActiveButton(document.getElementById('btn-add'));
+    document.getElementById('page-title').textContent = "Add New Card";
+    document.getElementById('view-tabs-container').style.display = 'none';
+    const container = document.getElementById('dynamic-container');
+    container.className = "";
+    container.innerHTML = "<p style='color: var(--text-muted);'>Loading configuration...</p>";
+    
+    const pQ = query(collection(db, "players"), where("seasonId", "==", currentSeasonId));
+    const pSnap = await getDocs(pQ);
+    if (pSnap.empty) {
+        container.innerHTML = `<p style='color: var(--danger);'>Please register players in the Season Roster first!</p>`;
+        return;
+    }
+    
+    let pOptions = "";
+    pSnap.forEach(d => pOptions += `<option value="${d.data().playerName}">${d.data().playerName}</option>`);
+
+    const eQ = query(collection(db, "user_events"), where("userId", "==", currentUser.uid));
+    const eSnap = await getDocs(eQ);
+    let eventOptions = `<option value="Gold Base">Gold Base</option><option value="TOTW">TOTW</option>`;
+    eSnap.forEach(d => eventOptions += `<option value="${d.data().name}">${d.data().name}</option>`);
+    eventOptions += `<option value="ADD_NEW">+ Add New Event...</option>`;
+
+    container.innerHTML = `
+        <div class="setup-box" style="margin: 0; box-shadow: none; width: 100%; max-width: 500px; text-align: left;">
+            <form id="add-card-form" style="display:flex; flex-direction:column; gap:15px; margin: 0;">
+                <label style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: -10px;">Select Player</label>
+                <select id="selectedPlayer">${pOptions}</select>
+                
+                <label style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: -10px;">Promo Event</label>
+                <select id="promoEvent" onchange="if(this.value==='ADD_NEW') document.getElementById('customEventContainer').style.display='block'; else document.getElementById('customEventContainer').style.display='none';">
+                    ${eventOptions}
+                </select>
+                
+                <div id="customEventContainer" style="display:none; margin-top: -5px;">
+                    <input type="text" id="customEventName" placeholder="Type new event name...">
+                </div>
+                
+                <label style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: -10px;">Overall Rating</label>
+                <input type="number" id="rating" placeholder="e.g. 90" required>
+                
+                <label style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: -10px;">Card Image (PNG/JPG)</label>
+                <input type="file" id="cardImage" accept="image/*" required>
+                
+                <button type="submit" id="submitBtn" class="primary-btn" style="margin-top: 10px;">Upload Card</button>
             </form>
         </div>
     `;
 
-    // Attach event listener to the newly created form
-    document.getElementById('add-card-form').addEventListener('submit', handleAddCard);
-});
-
-// ==========================================
-// 5. Add Card Logic (ImgBB Upload + Firestore Save)
-// ==========================================
-async function handleAddCard(e) {
-    e.preventDefault();
-    const submitBtn = document.getElementById('submitBtn');
-    submitBtn.textContent = "Uploading Image...";
-    submitBtn.disabled = true;
-
-    const fileInput = document.getElementById('cardImage');
-    const imageFile = fileInput.files[0];
-
-    try {
-        // Step A: Upload image to ImgBB
-        const formData = new FormData();
-        formData.append('image', imageFile);
-
-        const imgbbResponse = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, {
-            method: 'POST',
-            body: formData
-        });
-        const imgbbData = await imgbbResponse.json();
+    document.getElementById('add-card-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = document.getElementById('submitBtn'); 
+        btn.textContent = "Uploading..."; 
+        btn.disabled = true;
         
-        if (!imgbbData.success) {
-            throw new Error("Failed to upload image to ImgBB");
-        }
-
-        const imageUrl = imgbbData.data.url; // Get direct image URL
-
-        // Step B: Save data to Firestore Database
-        submitBtn.textContent = "Saving to Database...";
-        await addDoc(collection(db, "cards"), {
-            playerName: document.getElementById('playerName').value,
-            promoEvent: document.getElementById('promoEvent').value,
-            rating: Number(document.getElementById('rating').value),
-            imageUrl: imageUrl,
-            clubName: currentClub, // Link the card to the current club
-            createdAt: new Date()
-        });
-
-        alert("Card added successfully!");
-        btnPlayers.click(); // Redirect back to the squad view
-
-    } catch (error) {
-        console.error("Error adding document: ", error);
-        alert("Error adding card. Check console for details.");
-        submitBtn.textContent = "Upload Card";
-        submitBtn.disabled = false;
-    }
-}
-
-// ==========================================
-// 6. Fetch and Display Cards Logic
-// ==========================================
-async function loadCards() {
-    container.className = "cards-grid";
-    container.innerHTML = "<p>Loading cards...</p>";
-
-    try {
-        // Query cards filtered by the current club name
-        const q = query(collection(db, "cards"), where("clubName", "==", currentClub));
-        const querySnapshot = await getDocs(q);
-        
-        container.innerHTML = "";
-        
-        if (querySnapshot.empty) {
-            container.innerHTML = "<p>No cards found for your club. Add some!</p>";
-            return;
-        }
-
-        // Render each card as HTML element
-        querySnapshot.forEach((docSnap) => {
-            const cardData = docSnap.data();
-            const cardId = docSnap.id;
-            
-            const cardElement = document.createElement('div');
-            cardElement.className = 'card-item';
-            
-            // Inline styling added for the delete button (X)
-            cardElement.innerHTML = `
-                <button class="delete-btn" onclick="deleteCard('${cardId}')" style="position: absolute; top: 5px; right: 5px; background: #ff4c4c; color: white; border: none; cursor: pointer; padding: 2px 8px; border-radius: 4px; font-weight: bold; z-index: 10;">X</button>
-                <img src="${cardData.imageUrl}" alt="${cardData.playerName}">
-                <div class="card-info">
-                    <h3>${cardData.playerName} <span style="color:var(--gold)">${cardData.rating}</span></h3>
-                    <p>${cardData.promoEvent}</p>
-                </div>
-            `;
-            container.appendChild(cardElement);
-        });
-
-    } catch (error) {
-        console.error("Error loading cards: ", error);
-        container.innerHTML = "<p>Error loading cards.</p>";
-    }
-}
-
-// ==========================================
-// 7. Delete Card Logic
-// ==========================================
-window.deleteCard = async function(cardId) {
-    if (confirm("Are you sure you want to delete this card?")) {
         try {
-            await deleteDoc(doc(db, "cards", cardId));
-            loadCards(); // Refresh UI after deletion
-        } catch (error) {
-            console.error("Error deleting card: ", error);
-            alert("Error deleting card.");
+            let eventName = document.getElementById('promoEvent').value;
+            if (eventName === 'ADD_NEW') {
+                eventName = document.getElementById('customEventName').value.trim();
+                if(eventName) await addDoc(collection(db, "user_events"), { name: eventName, userId: currentUser.uid });
+            }
+
+            const formData = new FormData(); 
+            formData.append('image', document.getElementById('cardImage').files[0]);
+            const res = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, { method: 'POST', body: formData });
+            const imgData = await res.json();
+            
+            if (!imgData.success) throw new Error("Image upload failed");
+
+            await addDoc(collection(db, "cards"), {
+                playerName: document.getElementById('selectedPlayer').value,
+                promoEvent: eventName,
+                rating: Number(document.getElementById('rating').value),
+                imageUrl: imgData.data.url,
+                seasonId: currentSeasonId,
+                userId: currentUser.uid,
+                createdAt: new Date()
+            });
+            document.getElementById('btn-players').click();
+        } catch(err) {
+            alert("Error: " + err.message);
+            btn.textContent = "Upload Card";
+            btn.disabled = false;
         }
-    }
-};
+    });
+});

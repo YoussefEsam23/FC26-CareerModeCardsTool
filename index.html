@@ -4,49 +4,91 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>UT Manager | Career Mode</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <!-- Setup Screen (Shows only on first visit to create the generic club) -->
-    <div id="setup-screen" class="setup-screen">
+
+    <!-- Auth Screen -->
+    <div id="auth-screen" class="setup-screen">
         <div class="setup-box">
-            <h1>Welcome to UT Manager</h1>
-            <p>Enter your Career Mode club name to get started</p>
-            <input type="text" id="club-name-input" placeholder="e.g. AFC Bournemouth" required>
-            <button id="btn-create-club">Create Club</button>
+            <h1 id="auth-title" class="gold-text">Login</h1>
+            <form id="auth-form">
+                <input type="email" id="auth-email" placeholder="Email Address" required>
+                <input type="password" id="auth-password" placeholder="Password" required minlength="6">
+                <button type="submit" id="auth-submit-btn" class="primary-btn">Login</button>
+            </form>
+            <p style="margin-top: 20px;">
+                <span id="auth-toggle-text" style="color: var(--text-muted);">Don't have an account?</span> 
+                <button id="auth-toggle-btn" class="text-btn" style="color: var(--text-light); text-decoration: underline;">Sign Up</button>
+            </p>
+            <p id="auth-error" style="color: var(--danger); margin-top: 15px; display: none;"></p>
         </div>
     </div>
 
-    <!-- Main Application Container -->
-    <div class="app-container" id="main-app" style="display: none;">
-        
-        <!-- Sidebar Navigation -->
-        <aside class="sidebar">
-            <div class="logo">
-                <h2 id="display-club-name">Club <span>UT 26</span></h2>
-                <button id="btn-reset-club" class="text-btn">Change Club</button>
-            </div>
-            <nav>
-                <button id="btn-players" class="nav-btn active">Players View</button>
-                <button id="btn-add" class="nav-btn add-btn">+ Add New Card</button>
-            </nav>
-        </aside>
-
-        <!-- Main Content Area -->
-        <main class="main-content">
-            <header>
-                <h1 id="page-title">Squad Players</h1>
-            </header>
-            
-            <!-- Dynamic Container for Cards or Forms -->
-            <div id="dynamic-container" class="cards-grid">
-                <!-- Content will load here dynamically via app.js -->
-            </div>
-        </main>
-        
+    <!-- Clubs Screen -->
+    <div id="clubs-screen" class="setup-screen" style="display: none;">
+        <div class="setup-box" style="width: 500px; max-height: 80vh; overflow-y: auto;">
+            <h1 class="gold-text" style="margin-bottom: 20px;">Your Clubs</h1>
+            <div id="clubs-list" style="display: flex; flex-direction: column; margin-bottom: 20px; text-align: left;"></div>
+            <hr style="border-color: var(--border-color); margin: 25px 0;">
+            <h3 style="text-align: left; margin-bottom: 15px; color: var(--text-muted); font-size: 1rem;">Create New Club</h3>
+            <form id="create-club-form" style="display: flex; gap: 10px;">
+                <input type="text" id="new-club-name" placeholder="e.g. Arsenal" required style="flex: 1; margin: 0;">
+                <button type="submit" class="primary-btn" style="width: auto;">Create</button>
+            </form>
+            <button id="btn-logout-clubs" class="text-btn" style="margin-top: 30px; color: var(--danger); width: 100%;">Log Out</button>
+        </div>
     </div>
 
-    <!-- Import JavaScript as a module for Firebase support -->
+    <!-- Seasons Screen -->
+    <div id="seasons-screen" class="setup-screen" style="display: none;">
+        <div class="setup-box" style="width: 500px; max-height: 80vh; overflow-y: auto;">
+            <button id="btn-back-to-clubs-setup" class="text-btn" style="margin-bottom: 15px;">&larr; Back to Clubs</button>
+            <h1 id="seasons-club-title" class="gold-text" style="margin-bottom: 20px;">Club Seasons</h1>
+            <div id="seasons-list" style="display: flex; flex-direction: column; margin-bottom: 20px; text-align: left;"></div>
+            <hr style="border-color: var(--border-color); margin: 25px 0;">
+            <h3 style="text-align: left; margin-bottom: 15px; color: var(--text-muted); font-size: 1rem;">Add New Season</h3>
+            <form id="create-season-form" style="display: flex; gap: 10px;">
+                <input type="text" id="new-season-name" placeholder="e.g. 2024/2025" required style="flex: 1; margin: 0;">
+                <button type="submit" class="primary-btn" style="width: auto;">Add</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Main Application -->
+    <div class="app-container" id="main-app" style="display: none;">
+        <aside class="sidebar">
+            <div class="logo">
+                <div class="club-header-info">
+                    <h2 id="display-club-name">Club</h2>
+                    <span id="display-season-name" class="season-badge">Season</span>
+                </div>
+                <div class="switcher-btns">
+                    <button id="btn-back-clubs" class="switch-btn">&larr; Club</button>
+                    <button id="btn-back-seasons" class="switch-btn">&larr; Season</button>
+                </div>
+            </div>
+            <nav style="margin-top: 10px;">
+                <button id="btn-players" class="nav-btn active">Squad Cards</button>
+                <button id="btn-roster" class="nav-btn">Season Roster</button>
+                <button id="btn-add" class="nav-btn add-btn">+ Add New Card</button>
+            </nav>
+            <button id="btn-logout" class="nav-btn" style="margin-top: auto; color: var(--danger); justify-content: flex-start; border-left: none;">Log Out</button>
+        </aside>
+
+        <main class="main-content">
+            <header>
+                <h1 id="page-title">Squad Cards</h1>
+                <div id="view-tabs-container" class="tabs" style="display: none;">
+                    <button class="tab-btn active" id="view-by-player">Group by Player</button>
+                    <button class="tab-btn" id="view-by-promo">Group by Event</button>
+                    <button class="tab-btn" id="view-by-rating">Sort by Rating</button>
+                </div>
+            </header>
+            <div id="dynamic-container" class="cards-grid"></div>
+        </main>
+    </div>
+
     <script type="module" src="app.js"></script>
 </body>
 </html>

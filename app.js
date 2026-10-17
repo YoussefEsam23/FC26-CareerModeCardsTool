@@ -23,9 +23,31 @@ let currentSeasonId = "";
 let currentSeasonName = "";
 let selectedRosterPlayer = null; 
 
+// متغيرات البحث والفلترة
+let allCards = []; 
+let allPlayers = [];
+let currentViewMode = 'player'; 
+let currentSearchQuery = "";
+let activeAppSection = "cards"; // 'cards' أو 'roster'
+
 const authScreen = document.getElementById('auth-screen');
 const authForm = document.getElementById('auth-form');
 let isLoginMode = true;
+
+// تفعيل استماع البحث الفوري
+document.addEventListener('DOMContentLoaded', () => {
+    const searchInput = document.getElementById('main-search-input');
+    if (searchInput) {
+        searchInput.addEventListener('input', (e) => {
+            currentSearchQuery = e.target.value.toLowerCase().trim();
+            if (activeAppSection === 'cards') {
+                renderCards();
+            } else if (activeAppSection === 'roster') {
+                renderRosterScreen();
+            }
+        });
+    }
+});
 
 document.getElementById('auth-toggle-btn').addEventListener('click', () => {
     isLoginMode = !isLoginMode;
@@ -85,7 +107,6 @@ window.deleteClub = async function(clubId) {
         await deleteDoc(doc(db, "clubs", clubId));
         await loadClubsScreen();
     } catch (err) {
-        console.error("Error deleting club:", err);
         alert("Error deleting club: " + err.message);
     }
 };
@@ -95,7 +116,6 @@ window.deleteSeason = async function(seasonId) {
         await deleteDoc(doc(db, "seasons", seasonId));
         await loadSeasonsScreen();
     } catch (err) {
-        console.error("Error deleting season:", err);
         alert("Error deleting season: " + err.message);
     }
 };
@@ -105,7 +125,6 @@ window.deletePlayer = async function(playerId) {
         await deleteDoc(doc(db, "players", playerId));
         document.getElementById('btn-roster').click();
     } catch (err) {
-        console.error("Error deleting player:", err);
         alert("Error deleting player: " + err.message);
     }
 };
@@ -119,8 +138,80 @@ window.deleteCard = async function(cardId) {
             document.getElementById('btn-players').click();
         }
     } catch (err) {
-        console.error("Error deleting card:", err);
         alert("Error deleting card: " + err.message);
+    }
+};
+
+// ----------------------------------------------------
+// Custom Card Types Management (Edit & Delete)
+// ----------------------------------------------------
+window.openManageEventsModal = async function() {
+    const eQ = query(collection(db, "user_events"), where("userId", "==", currentUser.uid));
+    const eSnap = await getDocs(eQ);
+    let eventsListHTML = "";
+    
+    if (eSnap.empty) {
+        eventsListHTML = `<p style="color: var(--text-muted); text-align: center;">No custom card types found.</p>`;
+    } else {
+        eSnap.forEach(d => {
+            const ev = d.data();
+            eventsListHTML += `
+                <div class="list-item" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding: 10px 14px;">
+                    <span style="font-size: 0.95rem;">${ev.name}</span>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <button type="button" class="edit-btn" style="position: static; opacity: 1; transform: none; height: 28px; padding: 0 12px; font-size: 0.75rem;" onclick="editEventName('${d.id}', '${ev.name}')">Edit</button>
+                        <button type="button" class="circle-delete-btn" onclick="deleteCustomEvent('${d.id}', '${ev.name}')">X</button>
+                    </div>
+                </div>
+            `;
+        });
+    }
+
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.id = 'manage-events-modal';
+    modal.innerHTML = `
+        <div class="modal-box" style="max-width: 425px;">
+            <h3 class="gold-text">Manage Card Types</h3>
+            <div style="max-height: 250px; overflow-y: auto; margin: 10px 0; text-align: left;">
+                ${eventsListHTML}
+            </div>
+            <button type="button" class="primary-btn" onclick="document.getElementById('manage-events-modal').remove()" style="width: 100%; margin-top: 10px;">Close</button>
+        </div>
+    `;
+    document.body.appendChild(modal);
+};
+
+window.deleteCustomEvent = async function(eventId, eventName) {
+    if (!confirm(`Are you sure you want to delete the card type "${eventName}"?`)) return;
+    try {
+        await deleteDoc(doc(db, "user_events", eventId));
+        document.getElementById('manage-events-modal').remove();
+        openManageEventsModal();
+    } catch (err) {
+        alert("Error deleting card type: " + err.message);
+    }
+};
+
+window.editEventName = async function(eventId, oldName) {
+    const newName = prompt("Enter new name for the card type:", oldName);
+    if (!newName || newName.trim() === "" || newName.trim() === oldName) return;
+    
+    try {
+        const trimmedName = newName.trim();
+        await updateDoc(doc(db, "user_events", eventId), { name: trimmedName });
+
+        const cardsQ = query(collection(db, "cards"), where("seasonId", "==", currentSeasonId), where("promoEvent", "==", oldName));
+        const cardsSnap = await getDocs(cardsQ);
+        for (const cardDoc of cardsSnap.docs) {
+            await updateDoc(doc(db, "cards", cardDoc.id), { promoEvent: trimmedName });
+        }
+
+        alert("Card type updated successfully!");
+        document.getElementById('manage-events-modal').remove();
+        openManageEventsModal();
+    } catch (err) {
+        alert("Error updating card type: " + err.message);
     }
 };
 
@@ -222,36 +313,71 @@ function setActiveButton(activeBtn) {
 }
 
 // ----------------------------------------------------
-// Club Roster & Categorized Players Management (أبجدي + أعلى كارت)
+// Club Roster & Categorized Players Management
 // ----------------------------------------------------
 document.getElementById('btn-roster').addEventListener('click', async () => {
     selectedRosterPlayer = null;
+    activeAppSection = 'roster';
+    currentSearchQuery = "";
+    if (document.getElementById('main-search-input')) {
+        document.getElementById('main-search-input').value = "";
+    }
+
     setActiveButton(document.getElementById('btn-roster'));
     document.getElementById('page-title').textContent = "Squad Players";
     document.getElementById('view-tabs-container').style.display = 'none';
+
+    const searchBox = document.getElementById('search-box-container');
+    if (searchBox) {
+        searchBox.style.display = 'block';
+        document.getElementById('main-search-input').placeholder = "Search by player name...";
+    }
+
+    const countersContainer = document.getElementById('counters-container');
+    if (countersContainer) {
+        countersContainer.style.display = 'flex';
+        countersContainer.innerHTML = `
+            <div class="app-counter-badge">
+                <span class="counter-title">Total Players</span>
+                <span class="counter-value" id="players-count">0</span>
+            </div>
+        `;
+    }
+
     const container = document.getElementById('dynamic-container');
     container.className = "";
     container.innerHTML = "<p style='color: var(--text-muted);'>Loading your players...</p>";
 
-    // جلب اللاعبين والكروت الخاصة بالموسم الحالي
     const pQuery = query(collection(db, "players"), where("seasonId", "==", currentSeasonId));
     const pSnap = await getDocs(pQuery);
-    
+    allPlayers = pSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+    renderRosterScreen();
+});
+
+async function renderRosterScreen() {
+    const container = document.getElementById('dynamic-container');
+    container.className = "";
+
+    if (document.getElementById('players-count')) {
+        document.getElementById('players-count').textContent = allPlayers.length;
+    }
+
     const cQuery = query(collection(db, "cards"), where("seasonId", "==", currentSeasonId));
     const cSnap = await getDocs(cQuery);
-    const cardsMap = {}; // تخزين أعلى كارت لكل لاعب
+    const cardsMap = {}; 
     cSnap.forEach(d => {
         const card = d.data();
         const pName = card.playerName;
-        if (!cardsMap[pName]) {
+        if (!cardsMap[pName] || Number(card.rating) > Number(cardsMap[pName].rating)) {
             cardsMap[pName] = card;
-        } else {
-            // اختيار أعلى كارت تقييماً
-            if (Number(card.rating) > Number(cardsMap[pName].rating)) {
-                cardsMap[pName] = card;
-            }
         }
     });
+
+    let filteredPlayers = allPlayers;
+    if (currentSearchQuery) {
+        filteredPlayers = allPlayers.filter(p => p.playerName.toLowerCase().includes(currentSearchQuery));
+    }
     
     let rosterHTML = `
         <div class="setup-box" style="margin: 0; box-shadow: none; width: 100%; max-width: 650px; text-align: left; margin-bottom: 30px;">
@@ -278,8 +404,8 @@ document.getElementById('btn-roster').addEventListener('click', async () => {
         </div>
     `;
 
-    if (pSnap.empty) {
-        rosterHTML += `<p style='color: var(--text-muted);'>No players registered. Add one above!</p>`;
+    if (filteredPlayers.length === 0) {
+        rosterHTML += `<p style='color: var(--text-muted);'>No players found matching your search.</p>`;
         container.innerHTML = rosterHTML;
     } else {
         const categories = {
@@ -289,8 +415,7 @@ document.getElementById('btn-roster').addEventListener('click', async () => {
             "ATTACKERS": { title: "ATTACKERS", positions: ["LW", "RW", "ST"], players: [] }
         };
 
-        pSnap.forEach((docSnap) => {
-            const p = { id: docSnap.id, ...docSnap.data() };
+        filteredPlayers.forEach((p) => {
             let matched = false;
             for (const key in categories) {
                 if (categories[key].positions.includes(p.position)) {
@@ -304,7 +429,6 @@ document.getElementById('btn-roster').addEventListener('click', async () => {
             }
         });
 
-        // ترتيب اللاعبين داخل كل فئة أبجدياً من A to Z
         for (const key in categories) {
             categories[key].players.sort((a, b) => a.playerName.localeCompare(b.playerName));
         }
@@ -324,14 +448,12 @@ document.getElementById('btn-roster').addEventListener('click', async () => {
                     let cardDisplayHTML = "";
 
                     if (topCard) {
-                        // عرض أعلى كارت وصل إليه اللاعب
                         cardDisplayHTML = `
                             <img src="${topCard.imageUrl}" alt="${p.playerName}" style="width: 100%; max-width: 150px; border-radius: 8px; margin-bottom: 10px; transition: var(--transition-smooth);">
                             <h4>${p.playerName} <span style="color: var(--gold);">${topCard.rating}</span></h4>
                             <p style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase;">${topCard.promoEvent}</p>
                         `;
                     } else {
-                        // في حال لم يكن له كروت، يعرض الاسم والمركز كافتراضي
                         cardDisplayHTML = `
                             <div style="height: 140px; display: flex; align-items: center; justify-content: center; color: var(--text-muted); font-size: 0.9rem;">No Cards Yet</div>
                             <h4>${p.playerName}</h4>
@@ -358,15 +480,18 @@ document.getElementById('btn-roster').addEventListener('click', async () => {
         e.preventDefault();
         const btn = e.target.querySelector('button'); btn.disabled = true;
         await addDoc(collection(db, "players"), {
-            playerName: document.getElementById('newPlayerNameN')?.value || document.getElementById('newPlayerName').value.trim(),
+            playerName: document.getElementById('newPlayerName').value.trim(),
             position: document.getElementById('newPlayerPosition').value,
             seasonId: currentSeasonId,
             userId: currentUser.uid,
             createdAt: new Date()
         });
-        document.getElementById('btn-roster').click();
+        const pQuery2 = query(collection(db, "players"), where("seasonId", "==", currentSeasonId));
+        const pSnap2 = await getDocs(pQuery2);
+        allPlayers = pSnap2.docs.map(d => ({ id: d.id, ...d.data() }));
+        renderRosterScreen();
     });
-});
+}
 
 // Edit Player Modal
 window.openEditPlayerModal = async function(playerId, curName, curPos) {
@@ -423,7 +548,7 @@ window.openEditPlayerModal = async function(playerId, curName, curPos) {
     });
 };
 
-// Open Player Specific Cards Page (مع زر Add Card جوه الصفحة)
+// Open Player Specific Cards Page
 window.openPlayerCards = async function(playerName, position) {
     selectedRosterPlayer = { name: playerName, position: position };
     document.getElementById('page-title').innerHTML = `
@@ -436,6 +561,13 @@ window.openPlayerCards = async function(playerName, position) {
         </div>
     `;
     document.getElementById('view-tabs-container').style.display = 'none';
+    
+    const searchBox = document.getElementById('search-box-container');
+    if (searchBox) searchBox.style.display = 'none';
+
+    if (document.getElementById('counters-container')) {
+        document.getElementById('counters-container').style.display = 'none';
+    }
 
     const container = document.getElementById('dynamic-container');
     container.className = "cards-grid";
@@ -458,10 +590,18 @@ window.openPlayerCards = async function(playerName, position) {
     });
 };
 
-// دالة إضافة كارت خاص باللاعب مباشرة من داخل نافذته
+// Add Card for specific player directly
 window.openAddCardForPlayer = async function(prefilledPlayerName) {
     document.getElementById('page-title').textContent = `Add Card for ${prefilledPlayerName}`;
     document.getElementById('view-tabs-container').style.display = 'none';
+    
+    const searchBox = document.getElementById('search-box-container');
+    if (searchBox) searchBox.style.display = 'none';
+
+    if (document.getElementById('counters-container')) {
+        document.getElementById('counters-container').style.display = 'none';
+    }
+
     const container = document.getElementById('dynamic-container');
     container.className = "";
 
@@ -469,7 +609,7 @@ window.openAddCardForPlayer = async function(prefilledPlayerName) {
     const eSnap = await getDocs(eQ);
     let eventOptions = `<option value="Gold Base">Gold Base</option><option value="TOTW">TOTW</option>`;
     eSnap.forEach(d => eventOptions += `<option value="${d.data().name}">${d.data().name}</option>`);
-    eventOptions += `<option value="ADD_NEW">+ Add New Event...</option>`;
+    eventOptions += `<option value="ADD_NEW">+ Add New Card Type...</option>`;
 
     container.innerHTML = `
         <div class="setup-box" style="margin: 0; box-shadow: none; width: 100%; max-width: 500px; text-align: left;">
@@ -477,13 +617,16 @@ window.openAddCardForPlayer = async function(prefilledPlayerName) {
                 <label style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: -10px;">Assigned Player</label>
                 <input type="text" id="selectedPlayerFixed" value="${prefilledPlayerName}" readonly style="background: var(--bg-dark); color: var(--gold); font-weight: bold; cursor: not-allowed;">
                 
-                <label style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: -10px;">Promo Event</label>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: -6px;">
+                    <label style="color: var(--text-muted); font-size: 0.9rem;">Card Type</label>
+                    <button type="button" class="text-btn" onclick="openManageEventsModal()" style="color: var(--gold); font-size: 0.8rem; text-decoration: underline;">Manage Card Types</button>
+                </div>
                 <select id="promoEvent" onchange="if(this.value==='ADD_NEW') document.getElementById('customEventContainer').style.display='block'; else document.getElementById('customEventContainer').style.display='none';">
                     ${eventOptions}
                 </select>
                 
                 <div id="customEventContainer" style="display:none; margin-top: -5px;">
-                    <input type="text" id="customEventName" placeholder="Type new event name...">
+                    <input type="text" id="customEventName" placeholder="Type new card type name...">
                 </div>
                 
                 <label style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: -10px;">Overall Rating</label>
@@ -542,9 +685,6 @@ window.openAddCardForPlayer = async function(prefilledPlayerName) {
 // ----------------------------------------------------
 // Cards Management & Triple View
 // ----------------------------------------------------
-let allCards = []; 
-let currentViewMode = 'player'; 
-
 function setActiveTab(activeId) {
     document.querySelectorAll('#view-tabs-container .tab-btn').forEach(btn => btn.classList.remove('active'));
     document.getElementById(activeId).classList.add('active');
@@ -553,32 +693,71 @@ function setActiveTab(activeId) {
 document.getElementById('view-by-player').addEventListener('click', () => {
     currentViewMode = 'player';
     setActiveTab('view-by-player');
+    document.getElementById('main-search-input').placeholder = "Search by player name...";
     renderCards();
 });
 
 document.getElementById('view-by-promo').addEventListener('click', () => {
     currentViewMode = 'promo';
     setActiveTab('view-by-promo');
+    document.getElementById('main-search-input').placeholder = "Search by card type...";
     renderCards();
 });
 
 document.getElementById('view-by-rating').addEventListener('click', () => {
     currentViewMode = 'rating';
     setActiveTab('view-by-rating');
+    document.getElementById('main-search-input').placeholder = "Search by player name...";
     renderCards();
 });
 
 document.getElementById('btn-players').addEventListener('click', async () => {
     selectedRosterPlayer = null;
+    activeAppSection = 'cards';
+    currentSearchQuery = "";
+    if (document.getElementById('main-search-input')) {
+        document.getElementById('main-search-input').value = "";
+    }
+
     setActiveButton(document.getElementById('btn-players'));
     document.getElementById('page-title').textContent = "Squad Cards";
     document.getElementById('view-tabs-container').style.display = 'flex';
-    document.getElementById('dynamic-container').className = "cards-grid";
-    document.getElementById('dynamic-container').innerHTML = "<p style='color: var(--text-muted);'>Loading...</p>";
+
+    const searchBox = document.getElementById('search-box-container');
+    if (searchBox) {
+        searchBox.style.display = 'block';
+        document.getElementById('main-search-input').placeholder = currentViewMode === 'player' ? "Search by player name..." : "Search by card type...";
+    }
+
+    const countersContainer = document.getElementById('counters-container');
+    if (countersContainer) {
+        countersContainer.style.display = 'flex';
+        countersContainer.innerHTML = `
+            <div class="app-counter-badge">
+                <span class="counter-title">Card Types</span>
+                <span class="counter-value" id="events-count">0</span>
+            </div>
+            <div class="app-counter-badge">
+                <span class="counter-title">Total Cards</span>
+                <span class="counter-value" id="cards-count">0</span>
+            </div>
+        `;
+    }
+
+    const container = document.getElementById('dynamic-container');
+    container.className = "cards-grid";
+    container.innerHTML = "<p style='color: var(--text-muted);'>Loading...</p>";
     
     const q = query(collection(db, "cards"), where("seasonId", "==", currentSeasonId));
     const snap = await getDocs(q);
     allCards = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+    const totalCards = allCards.length;
+    const uniqueEvents = new Set(allCards.map(c => c.promoEvent)).size;
+
+    if (document.getElementById('cards-count')) document.getElementById('cards-count').textContent = totalCards;
+    if (document.getElementById('events-count')) document.getElementById('events-count').textContent = uniqueEvents;
+
     renderCards();
 });
 
@@ -600,13 +779,24 @@ function renderCards() {
     const container = document.getElementById('dynamic-container');
     container.innerHTML = "";
     
-    if (allCards.length === 0) {
-        container.innerHTML = "<p style='color: var(--text-muted);'>No cards found.</p>";
+    let cardsToRender = allCards;
+    if (currentSearchQuery) {
+        if (currentViewMode === 'player') {
+            cardsToRender = allCards.filter(c => c.playerName.toLowerCase().includes(currentSearchQuery));
+        } else if (currentViewMode === 'promo') {
+            cardsToRender = allCards.filter(c => c.promoEvent.toLowerCase().includes(currentSearchQuery));
+        } else if (currentViewMode === 'rating') {
+            cardsToRender = allCards.filter(c => c.playerName.toLowerCase().includes(currentSearchQuery));
+        }
+    }
+
+    if (cardsToRender.length === 0) {
+        container.innerHTML = "<p style='color: var(--text-muted); grid-column: 1/-1;'>No cards found matching your search.</p>";
         return;
     }
 
     if (currentViewMode === 'rating') {
-        const sortedCards = [...allCards].sort((a, b) => Number(b.rating) - Number(a.rating));
+        const sortedCards = [...cardsToRender].sort((a, b) => Number(b.rating) - Number(a.rating));
         sortedCards.forEach(card => {
             container.innerHTML += createCardHTML(card);
         });
@@ -614,7 +804,7 @@ function renderCards() {
     }
 
     const groups = {};
-    allCards.forEach(card => {
+    cardsToRender.forEach(card => {
         const key = currentViewMode === 'player' ? card.playerName : card.promoEvent;
         if (!groups[key]) groups[key] = [];
         groups[key].push(card);
@@ -651,7 +841,7 @@ window.openEditModal = async function(cardId, curPlayer, curPromo, curRating, cu
         const eName = d.data().name;
         eventOptions += `<option value="${eName}" ${eName === curPromo ? 'selected' : ''}>${eName}</option>`;
     });
-    eventOptions += `<option value="ADD_NEW">+ Add New Event...</option>`;
+    eventOptions += `<option value="ADD_NEW">+ Add New Card Type...</option>`;
 
     const modal = document.createElement('div');
     modal.className = 'modal-overlay';
@@ -663,13 +853,16 @@ window.openEditModal = async function(cardId, curPlayer, curPromo, curRating, cu
                 <label>Assigned Player:</label>
                 <select id="editPlayer">${pOptions}</select>
                 
-                <label>Promo Event:</label>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: -6px;">
+                    <label style="color: var(--text-muted); font-size: 0.85rem;">Card Type</label>
+                    <button type="button" class="text-btn" onclick="openManageEventsModal()" style="color: var(--gold); font-size: 0.8rem; text-decoration: underline;">Manage Card Types</button>
+                </div>
                 <select id="editPromo" onchange="if(this.value==='ADD_NEW') document.getElementById('editCustomEventContainer').style.display='block'; else document.getElementById('editCustomEventContainer').style.display='none';">
                     ${eventOptions}
                 </select>
 
                 <div id="editCustomEventContainer" style="display:none;">
-                    <input type="text" id="editCustomEventName" placeholder="Type new event name...">
+                    <input type="text" id="editCustomEventName" placeholder="Type new card type name...">
                 </div>
                 
                 <label>Overall Rating:</label>
@@ -697,7 +890,7 @@ window.openEditModal = async function(cardId, curPlayer, curPromo, curRating, cu
             let eventName = document.getElementById('editPromo').value;
             if (eventName === 'ADD_NEW') {
                 eventName = document.getElementById('editCustomEventName').value.trim();
-                if (!eventName) throw new Error("Please enter a name for the new event.");
+                if (!eventName) throw new Error("Please enter a name for the new card type.");
                 await addDoc(collection(db, "user_events"), { name: eventName, userId: currentUser.uid });
             }
 
@@ -733,13 +926,21 @@ window.openEditModal = async function(cardId, curPlayer, curPromo, curRating, cu
 };
 
 // ----------------------------------------------------
-// Upload Card & Dynamic Events (الصفحة العامة للإضافة)
+// Upload Card & Dynamic Card Types
 // ----------------------------------------------------
 document.getElementById('btn-add').addEventListener('click', async () => {
     selectedRosterPlayer = null;
     setActiveButton(document.getElementById('btn-add'));
     document.getElementById('page-title').textContent = "Add New Card";
     document.getElementById('view-tabs-container').style.display = 'none';
+    
+    const searchBox = document.getElementById('search-box-container');
+    if (searchBox) searchBox.style.display = 'none';
+
+    if (document.getElementById('counters-container')) {
+        document.getElementById('counters-container').style.display = 'none';
+    }
+
     const container = document.getElementById('dynamic-container');
     container.className = "";
     container.innerHTML = "<p style='color: var(--text-muted);'>Loading configuration...</p>";
@@ -758,7 +959,7 @@ document.getElementById('btn-add').addEventListener('click', async () => {
     const eSnap = await getDocs(eQ);
     let eventOptions = `<option value="Gold Base">Gold Base</option><option value="TOTW">TOTW</option>`;
     eSnap.forEach(d => eventOptions += `<option value="${d.data().name}">${d.data().name}</option>`);
-    eventOptions += `<option value="ADD_NEW">+ Add New Event...</option>`;
+    eventOptions += `<option value="ADD_NEW">+ Add New Card Type...</option>`;
 
     container.innerHTML = `
         <div class="setup-box" style="margin: 0; box-shadow: none; width: 100%; max-width: 500px; text-align: left;">
@@ -766,13 +967,16 @@ document.getElementById('btn-add').addEventListener('click', async () => {
                 <label style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: -10px;">Select Player</label>
                 <select id="selectedPlayer">${pOptions}</select>
                 
-                <label style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: -10px;">Promo Event</label>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: -6px;">
+                    <label style="color: var(--text-muted); font-size: 0.9rem;">Card Type</label>
+                    <button type="button" class="text-btn" onclick="openManageEventsModal()" style="color: var(--gold); font-size: 0.8rem; text-decoration: underline;">Manage Card Types</button>
+                </div>
                 <select id="promoEvent" onchange="if(this.value==='ADD_NEW') document.getElementById('customEventContainer').style.display='block'; else document.getElementById('customEventContainer').style.display='none';">
                     ${eventOptions}
                 </select>
                 
                 <div id="customEventContainer" style="display:none; margin-top: -5px;">
-                    <input type="text" id="customEventName" placeholder="Type new event name...">
+                    <input type="text" id="customEventName" placeholder="Type new card type name...">
                 </div>
                 
                 <label style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: -10px;">Overall Rating</label>

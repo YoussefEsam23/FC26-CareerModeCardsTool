@@ -501,3 +501,55 @@ header { margin-bottom: 30px; }
         white-space: nowrap;
     }
 }
+
+/* =========================================
+   Counters Styling
+========================================= */
+.app-counter-badge {
+    background-color: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    padding: 8px 16px;
+    border-radius: 10px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    min-width: 110px;
+}
+
+.app-counter-badge span.counter-title {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.app-counter-badge span.counter-value {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: var(--gold);
+}
+
+.circle-delete-btn {
+    background: var(--danger);
+    color: white;
+    border: none;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    font-weight: bold;
+    font-size: 0.95rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: var(--transition-smooth);
+    box-shadow: 0 4px 10px rgba(239, 68, 68, 0.4);
+    padding: 0;
+}
+
+.circle-delete-btn:hover {
+    background: var(--danger-hover);
+    transform: scale(1.1);
+}
